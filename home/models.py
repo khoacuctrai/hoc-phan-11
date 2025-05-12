@@ -9,8 +9,9 @@ class Post(models.Model):
     img = models.ImageField(upload_to='post_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    likes = models.PositiveIntegerField(default=0)  # Thêm trường likes
 
-    def __str__(self):  
+    def __str__(self):
         return self.title
 
 class Comment(models.Model):
