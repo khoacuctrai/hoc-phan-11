@@ -8,5 +8,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('like/<int:post_id>/', views.like_post, name='like_post'),
-    
+    path('dislike/<int:post_id>/', views.dislike_post, name='dislike_post'),  # NEW
+    path('like-comment/<int:comment_id>/', views.like_comment, name='like_comment'),
+
 ]

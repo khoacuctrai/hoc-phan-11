@@ -13,6 +13,9 @@
     {% include 'navbar.html' %}
 
     <div class="container mt-5">
+
+        <p><strong>Lượt xem:</strong> {{ post.views }}</p>
+
         <h1>{{ post.title }}</h1>
         <p class="text-muted">Tác giả: {{ post.author }} | Ngày đăng: {{ post.created_at|date:"d/m/Y" }}</p>
         {% if post.img %}
@@ -50,6 +53,46 @@
             {{ form.as_p }}
             <button type="submit" class="btn btn-primary">Gửi</button>
         </form>
+        {% for comment in comments %}
+    <div class="comment">
+        <p><strong>{{ comment.user.username }}</strong>: {{ comment.content }}</p>
+        <p>
+            ❤️ {{ comment.total_likes }} lượt thích
+            {% if user.is_authenticated %}
+                <form action="{% url 'like_comment' comment.id %}" method="POST" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit">
+                        {% if user in comment.likes.all %}
+                            Bỏ thích
+                        {% else %}
+                            Thích
+                        {% endif %}
+                    </button>
+                </form>
+            {% endif %}
+        </p>
+    </div>
+{% endfor %}
+
+
+        {% if user.is_authenticated %}
+    <form action="{% url 'like_post' post.id %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit">
+            👍 Like ({{ post.total_likes }})
+        </button>
+    </form>
+
+    <form action="{% url 'dislike_post' post.id %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit">
+            👎 Dislike ({{ post.total_dislikes }})
+        </button>
+    </form>
+{% else %}
+    <p><a href="{% url 'login' %}">Đăng nhập</a> để thích hoặc không thích bài viết này.</p>
+{% endif %}
+
     </div>
 
     <!-- Bootstrap 4 JS and dependencies -->

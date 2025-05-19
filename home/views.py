@@ -5,14 +5,22 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
 from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+from django.contrib.auth.decorators import login_required
 
 def home(request):
     posts = Post.objects.all().order_by('-created_at')  # Lấy bài viết mới nhất
     return render(request, 'index.html', {'posts': posts})
-
 def product_detail(request, post_id):
     post = get_object_or_404(Post, id=post_id)
-    comments = post.comments.all()  # Lấy tất cả bình luận của bài viết
+
+    # ✅ Cập nhật lượt xem
+    post.views += 1
+    post.save(update_fields=['views'])
+
+    comments = post.comments.all()
+
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
@@ -23,7 +31,9 @@ def product_detail(request, post_id):
             return redirect('product_detail', post_id=post.id)
     else:
         form = CommentForm()
+
     return render(request, 'product_detail.html', {'post': post, 'comments': comments, 'form': form})
+
 
 def register(request):
     if request.method == 'POST':
@@ -57,10 +67,54 @@ def logout_view(request):
     logout(request)
     return redirect('home')  # Chuyển hướng về trang chủ sau khi đăng xuất
 
+@login_required
 def like_post(request, post_id):
     post = get_object_or_404(Post, id=post_id)
-    post.likes += 1
-    post.save()
-    if request.is_ajax():  # Kiểm tra nếu là yêu cầu AJAX
-        return JsonResponse({'likes': post.likes})  # Trả về số lượng like
+    user = request.user
+
+    if user in post.dislikes.all():
+        post.dislikes.remove(user)
+
+    if user in post.likes.all():
+        post.likes.remove(user)
+    else:
+        post.likes.add(user)
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'likes': post.total_likes(), 'dislikes': post.total_dislikes()})
+    
     return redirect('product_detail', post_id=post.id)
+
+@login_required
+def dislike_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    user = request.user
+
+    if user in post.likes.all():
+        post.likes.remove(user)  # Gỡ like nếu trước đó đã like
+
+    if user in post.dislikes.all():
+        post.dislikes.remove(user)
+    else:
+        post.dislikes.add(user)
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+
+        return JsonResponse({'likes': post.total_likes(), 'dislikes': post.total_dislikes()})
+    return redirect('product_detail', post_id=post.id)
+
+
+@login_required
+def like_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    user = request.user
+
+    if user in comment.likes.all():
+        comment.likes.remove(user)
+    else:
+        comment.likes.add(user)
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'likes': comment.total_likes()})
+    
+    return redirect('product_detail', post_id=comment.post.id)
