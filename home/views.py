@@ -6,8 +6,8 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from .models import Post, CartItem, Order
 
-from django.contrib.auth.decorators import login_required
 
 def home(request):
     posts = Post.objects.all().order_by('-created_at')  # Lấy bài viết mới nhất
@@ -18,7 +18,7 @@ def product_detail(request, post_id):
     # ✅ Cập nhật lượt xem
     post.views += 1
     post.save(update_fields=['views'])
-
+    
     comments = post.comments.all()
 
     if request.method == 'POST':
@@ -67,7 +67,6 @@ def logout_view(request):
     logout(request)
     return redirect('home')  # Chuyển hướng về trang chủ sau khi đăng xuất
 
-@login_required
 def like_post(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     user = request.user
@@ -75,14 +74,8 @@ def like_post(request, post_id):
     if user in post.dislikes.all():
         post.dislikes.remove(user)
 
-    if user in post.likes.all():
-        post.likes.remove(user)
-    else:
-        post.likes.add(user)
-
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'likes': post.total_likes(), 'dislikes': post.total_dislikes()})
-    
+    post.likes += 1
+    post.save()
     return redirect('product_detail', post_id=post.id)
 
 @login_required
@@ -118,3 +111,44 @@ def like_comment(request, comment_id):
         return JsonResponse({'likes': comment.total_likes()})
     
     return redirect('product_detail', post_id=comment.post.id)
+
+
+
+@login_required
+def add_to_cart(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    cart_item, created = CartItem.objects.get_or_create(user=request.user, post=post)
+
+    if not created:
+        cart_item.quantity += 1
+    cart_item.save()
+    return redirect('view_cart')
+
+@login_required
+def view_cart(request):
+    items = CartItem.objects.filter(user=request.user)
+    total = sum(item.subtotal() for item in items)
+    return render(request, 'cart.html', {'items': items, 'total': total})
+
+@login_required
+def remove_from_cart(request, item_id):
+    item = get_object_or_404(CartItem, id=item_id, user=request.user)
+    item.delete()
+    return redirect('view_cart')
+
+@login_required
+def checkout(request):
+    items = CartItem.objects.filter(user=request.user)
+    if not items:
+        return redirect('view_cart')
+
+    order = Order.objects.create(user=request.user)
+    order.items.set(items)
+    order.save()
+
+    # Clear cart
+    items.delete()
+
+    return render(request, 'checkout_success.html', {'order': order})
+
+LOGIN_URL = '/accounts/login/'
